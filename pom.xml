@@ -29,5 +29,8 @@
     <revision>0.0.1-SNAPSHOT</revision>
     <scm.repo.detail>org.eclipse.daanse.io.fs.watcher</scm.repo.detail>
   </properties>
-
+  <modules>
+    <module>api</module>
+    <module>watchservice</module>
+  </modules>
 </project>
