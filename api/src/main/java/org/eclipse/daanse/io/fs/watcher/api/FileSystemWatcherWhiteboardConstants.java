@@ -26,7 +26,7 @@ public final class FileSystemWatcherWhiteboardConstants {
      * Prefix for all Service property of FileSystem Watchers
      * {@link FileSystemWatcherListener}.
      */
-    public static final String FILESYSTEM_WATCHER_PREFIX = "io.fs.watcher";
+    public static final String FILESYSTEM_WATCHER_PREFIX = "io.fs.watcher.";
 
     /**
      * Default value for
@@ -40,7 +40,7 @@ public final class FileSystemWatcherWhiteboardConstants {
      * <p>
      * The value of this service property must be of type {@code String}.
      */
-    public static final String FILESYSTEM_WATCHER_PATH = FILESYSTEM_WATCHER_PREFIX + ".path";
+    public static final String FILESYSTEM_WATCHER_PATH = FILESYSTEM_WATCHER_PREFIX + "path";
 
     /**
      * Service property specifying that a FileSystem Watchers
@@ -48,7 +48,7 @@ public final class FileSystemWatcherWhiteboardConstants {
      * <p>
      * The value of this service property must be of type {@code String}.
      */
-    public static final String FILESYSTEM_WATCHER_PATTERN = FILESYSTEM_WATCHER_PREFIX + ".pattern";
+    public static final String FILESYSTEM_WATCHER_PATTERN = FILESYSTEM_WATCHER_PREFIX + "pattern";
 
     /**
      * Service property specifying that a FileSystem Watchers
@@ -57,7 +57,7 @@ public final class FileSystemWatcherWhiteboardConstants {
      * The value of this service property must be of type {@code String} or array of
      * type {@code String}.
      */
-    public static final String FILESYSTEM_WATCHER_KINDS = FILESYSTEM_WATCHER_PREFIX + ".kinds";
+    public static final String FILESYSTEM_WATCHER_KINDS = FILESYSTEM_WATCHER_PREFIX + "kinds";
 
     /**
      * Service property specifying that a FileSystem Watchers
@@ -66,7 +66,7 @@ public final class FileSystemWatcherWhiteboardConstants {
      * The value of this service property must be of type {@code String} or
      * {@link Boolean} and set to &quot;true&quot; or <code>true</code>.
      */
-    public static final String FILESYSTEM_WATCHER_RECURSIVE = FILESYSTEM_WATCHER_PREFIX + ".recursive";
+    public static final String FILESYSTEM_WATCHER_RECURSIVE = FILESYSTEM_WATCHER_PREFIX + "recursive";
 
     /**
      * The name of the implementation capability for the Whiteboard Specification
