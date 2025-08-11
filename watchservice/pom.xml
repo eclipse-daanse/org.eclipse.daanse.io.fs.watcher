@@ -20,7 +20,8 @@
     <version>${revision}</version>
   </parent>
   <artifactId>org.eclipse.daanse.io.fs.watcher.watchservice</artifactId>
-
+  <name>Eclipse Daanse File System Watcher Implementation</name>
+  <description>Implementation for file system monitoring and watch services providing OSGi-compliant interfaces for detecting file and directory changes.</description>
   <dependencies>
     <dependency>
       <groupId>org.eclipse.daanse</groupId>
