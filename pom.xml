@@ -24,6 +24,8 @@
   <artifactId>org.eclipse.daanse.io.fs.watcher</artifactId>
   <version>${revision}</version>
   <packaging>pom</packaging>
+  <name>Eclipse Daanse File System Watcher</name>
+  <description>File system monitoring framework providing OSGi-compliant watch services for detecting file and directory changes. Includes API definitions and watch service implementations for monitoring configuration files, data sources, and other file system resources within the Daanse platform.</description>
 
   <properties>
     <revision>0.0.1-SNAPSHOT</revision>

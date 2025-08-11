@@ -20,6 +20,8 @@
     <version>${revision}</version>
   </parent>
   <artifactId>org.eclipse.daanse.io.fs.watcher.api</artifactId>
+  <name>Eclipse Daanse File System Watcher API</name>
+  <description>API definitions for file system monitoring and watch services providing OSGi-compliant interfaces for detecting file and directory changes. Defines the service contracts and event handling mechanisms for file system monitoring within the Daanse platform.</description>
 
   <dependencies>
 
