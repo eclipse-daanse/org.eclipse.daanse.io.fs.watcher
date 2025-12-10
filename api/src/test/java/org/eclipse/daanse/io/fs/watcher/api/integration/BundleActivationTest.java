@@ -11,7 +11,7 @@
 *   SmartCity Jena - initial
 *   Stefan Bischof (bipolis.org) - initial
 */
-package org.eclipse.daanse.io.fs.watcher.api;
+package org.eclipse.daanse.io.fs.watcher.api.integration;
 
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.osgi.framework.Bundle;

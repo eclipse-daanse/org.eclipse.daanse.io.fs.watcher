@@ -11,7 +11,7 @@
 *   SmartCity Jena - initial
 *   Stefan Bischof (bipolis.org) - initial
 */
-package org.eclipse.daanse.io.fs.watcher.watchservice;
+package org.eclipse.daanse.io.fs.watcher.watchservice.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -36,6 +36,7 @@ import org.osgi.test.common.annotation.InjectBundleContext;
 import org.osgi.test.junit5.context.BundleContextExtension;
 
 import aQute.bnd.annotation.spi.ServiceProvider;
+import org.eclipse.daanse.io.fs.watcher.watchservice.StoringFileSystemWatcherListener;
 
 @RequireServiceComponentRuntime
 @RequireConfigurationAdmin
