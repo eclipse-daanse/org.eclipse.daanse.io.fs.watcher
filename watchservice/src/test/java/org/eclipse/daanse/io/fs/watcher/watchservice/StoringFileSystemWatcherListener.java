@@ -24,9 +24,9 @@ import org.eclipse.daanse.io.fs.watcher.api.FileSystemWatcherListener;
 
 import java.util.Queue;
 
-class StoringFileSystemWatcherListener implements FileSystemWatcherListener {
+public class StoringFileSystemWatcherListener implements FileSystemWatcherListener {
 
-    StoringFileSystemWatcherListener() {
+    public StoringFileSystemWatcherListener() {
         clear();
     }
 
