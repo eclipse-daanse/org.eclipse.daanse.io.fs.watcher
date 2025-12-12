@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.daanse.io.fs.watcher.api.FileSystemWatcherListener;
 import org.osgi.service.component.ComponentServiceObjects;
@@ -70,7 +71,17 @@ public class PathWatcherService {
         LOGGER.info("deactivate - start");
 
         fileWatcherRunable.shutdown();
-        executorService.close();
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
+                LOGGER.warn("ExecutorService did not terminate in time, forcing shutdown");
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            LOGGER.warn("Interrupted while waiting for ExecutorService termination");
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
 
         LOGGER.info("deactivate - end");
 
