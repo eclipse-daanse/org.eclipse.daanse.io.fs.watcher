@@ -60,7 +60,7 @@ class FileWatcherRunable implements Runnable {
     final ReentrantReadWriteLock rwl = new ReentrantReadWriteLock();
     private CountDownLatch activationLatch = new CountDownLatch(1);
 
-    private AtomicBoolean stoped = new AtomicBoolean(false);
+    private AtomicBoolean stopped = new AtomicBoolean(false);
 
     public FileWatcherRunable() throws IOException {
 
@@ -114,7 +114,7 @@ class FileWatcherRunable implements Runnable {
     void removeFileWatcherRunable(FileSystemWatcherListener listener) {
 
         watchKeysToConfig.entrySet().stream().filter(e -> listener.equals(e.getValue().listener())).map(Entry::getKey)
-                .forEach(this::unregistertKey);
+                .forEach(this::unregisterKey);
 
     }
 
@@ -130,9 +130,12 @@ class FileWatcherRunable implements Runnable {
         }
 
         rwl.writeLock().lock();
-        WatchKey watchKey = path.register(watchService, kindsListToArray(config));
-        watchKeysToConfig.put(watchKey, config);
-        rwl.writeLock().unlock();
+        try {
+            WatchKey watchKey = path.register(watchService, kindsListToArray(config));
+            watchKeysToConfig.put(watchKey, config);
+        } finally {
+            rwl.writeLock().unlock();
+        }
 
     }
 
@@ -143,7 +146,7 @@ class FileWatcherRunable implements Runnable {
     public void shutdown() {
         LOGGER.info("shutdown - start");
 
-        stoped.set(true);
+        stopped.set(true);
         synchronized (watchKeysToConfig) {
             for (WatchKey key : watchKeysToConfig.keySet()) {
                 LOGGER.debug("cancel watchkey: {}", key);
@@ -169,12 +172,16 @@ class FileWatcherRunable implements Runnable {
     private void loopWatchUntilStop() {
         try {
             activationLatch.countDown();
-            while (!stoped.get()) {
+            while (!stopped.get()) {
                 WatchKey key = watchService.take();
 
+                WatchKeyConfig config;
                 rwl.readLock().lock();
-                WatchKeyConfig config = watchKeysToConfig.get(key);
-                rwl.readLock().unlock();
+                try {
+                    config = watchKeysToConfig.get(key);
+                } finally {
+                    rwl.readLock().unlock();
+                }
 
                 if (config == null) {
                     LOGGER.warn("no WatchKeyConfig for this EventKey {}", key);
@@ -217,8 +224,9 @@ class FileWatcherRunable implements Runnable {
 
         WatchEvent.Kind<?> kind = event.kind();
         if (kind == StandardWatchEventKinds.OVERFLOW) {
-            LOGGER.warn("handles event of type OVERFLOW Path: {}", event.context());
-            return;// not registerable
+            LOGGER.warn("OVERFLOW event detected - rescanning directory: {}", config.path());
+            rescanDirectory(config);
+            return;
         }
 
         if (!(event.context() instanceof Path)) {
@@ -270,11 +278,29 @@ class FileWatcherRunable implements Runnable {
 
     }
 
-    private void unregistertKey(WatchKey watchKey) {
+    private void rescanDirectory(WatchKeyConfig config) {
+        Path path = config.path();
+        LOGGER.info("rescanning directory after OVERFLOW: {}", path);
+
+        try (Stream<Path> stream = Files.list(path)) {
+            stream.forEach(resolvedFile -> {
+                config.oPattern().ifPresent(pattern -> {
+                    Matcher matcher = pattern.matcher(resolvedFile.toString());
+                    if (matcher.matches()) {
+                        config.listener().handlePathEvent(resolvedFile, StandardWatchEventKinds.ENTRY_CREATE);
+                    }
+                });
+            });
+        } catch (IOException e) {
+            LOGGER.error("Exception while rescanning directory: {}", path, e);
+        }
+    }
+
+    private void unregisterKey(WatchKey watchKey) {
         LOGGER.info("unregister watchkey: {}", watchKey);
         watchKey.cancel();
         WatchKeyConfig watchKeyConfig = watchKeysToConfig.remove(watchKey);
-        LOGGER.info("unregisterd watchkey for: {}", watchKeyConfig);
+        LOGGER.info("unregistered watchkey for: {}", watchKeyConfig);
     }
 
     private static List<Kind<?>> readKindsProperty(Map<String, Object> props) {
@@ -285,14 +311,12 @@ class FileWatcherRunable implements Runnable {
 
         List<Kind<?>> kinds = new ArrayList<>();
         if (oKinds instanceof String[] sKinds) {
-            for (int i = 0; i < sKinds.length; i++) {
-                String sKind = sKinds[i];
-                if ("ENTRY_CREATE".equals(sKind)) {
-                    kinds.add(EventKind.ENTRY_CREATE.getKind());
-                } else if ("ENTRY_DELETE".equals(sKind)) {
-                    kinds.add(EventKind.ENTRY_DELETE.getKind());
-                } else if ("ENTRY_MODIFY".equals(sKind)) {
-                    kinds.add(EventKind.ENTRY_MODIFY.getKind());
+            for (String sKind : sKinds) {
+                try {
+                    EventKind eventKind = EventKind.valueOf(sKind);
+                    kinds.add(eventKind.getKind());
+                } catch (IllegalArgumentException e) {
+                    LOGGER.warn("Unknown event kind: {}", sKind);
                 }
             }
         }
