@@ -30,6 +30,7 @@
   <properties>
     <revision>0.0.1-SNAPSHOT</revision>
     <scm.repo.detail>org.eclipse.daanse.io.fs.watcher</scm.repo.detail>
+    <maven.compiler.release>21</maven.compiler.release>
   </properties>
 
   <repositories>
