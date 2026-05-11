@@ -32,6 +32,7 @@ public class StoringFileSystemWatcherListener implements FileSystemWatcherListen
 
     private Queue<Path> initialPaths;
     private Queue<Entry<Path, Kind<Path>>> events;
+    private volatile Path basePath;
 
     void clear() {
         initialPaths = new ArrayDeque<>();
@@ -60,7 +61,11 @@ public class StoringFileSystemWatcherListener implements FileSystemWatcherListen
 
     @Override
     public void handleBasePath(Path basePath) {
+        this.basePath = basePath;
+    }
 
+    public Path getBasePath() {
+        return basePath;
     }
 
 }

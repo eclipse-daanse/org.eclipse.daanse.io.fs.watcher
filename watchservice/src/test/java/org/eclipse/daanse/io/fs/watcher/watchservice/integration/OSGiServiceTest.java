@@ -26,6 +26,7 @@ import java.util.Map;
 import org.eclipse.daanse.io.fs.watcher.api.FileSystemWatcherListener;
 import org.eclipse.daanse.io.fs.watcher.api.FileSystemWatcherWhiteboardConstants;
 import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.osgi.framework.BundleContext;
@@ -109,6 +110,45 @@ class OSGiServiceTest {
         Files.createTempFile(dir1, "wf2", ".txt");// create
         await().pollDelay(Duration.ofMillis(200)).atMost(WAIT_MOST).until(() -> listener.getEvents().isEmpty());
 
+    }
+
+    @Test
+    void testMultipleListenersWithDifferentPatterns() throws Exception {
+        StoringFileSystemWatcherListener listenerCsv = new StoringFileSystemWatcherListener();
+        StoringFileSystemWatcherListener listenerTxt = new StoringFileSystemWatcherListener();
+
+        Map<String, Object> mapCsv = Map.of(
+                FileSystemWatcherWhiteboardConstants.FILESYSTEM_WATCHER_PATH, path.toAbsolutePath().toString(),
+                FileSystemWatcherWhiteboardConstants.FILESYSTEM_WATCHER_PATTERN, ".*\\.csv");
+        Map<String, Object> mapTxt = Map.of(
+                FileSystemWatcherWhiteboardConstants.FILESYSTEM_WATCHER_PATH, path.toAbsolutePath().toString(),
+                FileSystemWatcherWhiteboardConstants.FILESYSTEM_WATCHER_PATTERN, ".*\\.txt");
+
+        ServiceRegistration<FileSystemWatcherListener> sregCsv = bc.registerService(FileSystemWatcherListener.class,
+                listenerCsv, asDictionary(mapCsv));
+        ServiceRegistration<FileSystemWatcherListener> sregTxt = bc.registerService(FileSystemWatcherListener.class,
+                listenerTxt, asDictionary(mapTxt));
+
+        // wait for both listeners to have their base path set (i.e. registered with the watcher)
+        await().atMost(WAIT_MOST)
+                .until(() -> listenerCsv.getBasePath() != null && listenerTxt.getBasePath() != null);
+
+        Path csvFile = path.resolve("data.csv");
+        Path txtFile = path.resolve("notes.txt");
+        Files.createFile(csvFile);
+        Files.createFile(txtFile);
+
+        // both listeners must each receive at least one event for their own file type
+        await().atMost(WAIT_MOST).until(() -> !listenerCsv.getEvents().isEmpty());
+        await().atMost(WAIT_MOST).until(() -> !listenerTxt.getEvents().isEmpty());
+
+        assertThat(listenerCsv.getEvents())
+                .allSatisfy(e -> assertThat(e.getKey().toString()).endsWith(".csv"));
+        assertThat(listenerTxt.getEvents())
+                .allSatisfy(e -> assertThat(e.getKey().toString()).endsWith(".txt"));
+
+        sregCsv.unregister();
+        sregTxt.unregister();
     }
 
 }
