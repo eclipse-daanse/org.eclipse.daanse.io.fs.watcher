@@ -31,7 +31,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -55,7 +54,7 @@ class FileWatcherRunable implements Runnable {
     private FileSystem fileSystem;
     private WatchService watchService;
 
-    private final Map<WatchKey, WatchKeyConfig> watchKeysToConfig = new ConcurrentHashMap<>();
+    private final Map<WatchKey, List<WatchKeyConfig>> watchKeysToConfig = new ConcurrentHashMap<>();
 
     final ReentrantReadWriteLock rwl = new ReentrantReadWriteLock();
     private CountDownLatch activationLatch = new CountDownLatch(1);
@@ -113,8 +112,20 @@ class FileWatcherRunable implements Runnable {
 
     void removeFileWatcherRunable(FileSystemWatcherListener listener) {
 
-        watchKeysToConfig.entrySet().stream().filter(e -> listener.equals(e.getValue().listener())).map(Entry::getKey)
-                .forEach(this::unregisterKey);
+        rwl.writeLock().lock();
+        try {
+            watchKeysToConfig.entrySet().removeIf(entry -> {
+                entry.getValue().removeIf(cfg -> listener.equals(cfg.listener()));
+                if (entry.getValue().isEmpty()) {
+                    LOGGER.info("unregister watchkey: {}", entry.getKey());
+                    entry.getKey().cancel();
+                    return true;
+                }
+                return false;
+            });
+        } finally {
+            rwl.writeLock().unlock();
+        }
 
     }
 
@@ -132,7 +143,7 @@ class FileWatcherRunable implements Runnable {
         rwl.writeLock().lock();
         try {
             WatchKey watchKey = path.register(watchService, kindsListToArray(config));
-            watchKeysToConfig.put(watchKey, config);
+            watchKeysToConfig.computeIfAbsent(watchKey, k -> new ArrayList<>()).add(config);
         } finally {
             rwl.writeLock().unlock();
         }
@@ -175,15 +186,16 @@ class FileWatcherRunable implements Runnable {
             while (!stopped.get()) {
                 WatchKey key = watchService.take();
 
-                WatchKeyConfig config;
+                List<WatchKeyConfig> configs;
                 rwl.readLock().lock();
                 try {
-                    config = watchKeysToConfig.get(key);
+                    List<WatchKeyConfig> raw = watchKeysToConfig.get(key);
+                    configs = raw != null ? List.copyOf(raw) : null;
                 } finally {
                     rwl.readLock().unlock();
                 }
 
-                if (config == null) {
+                if (configs == null || configs.isEmpty()) {
                     LOGGER.warn("no WatchKeyConfig for this EventKey {}", key);
                     continue;
                 }
@@ -191,7 +203,7 @@ class FileWatcherRunable implements Runnable {
                 if (LOGGER.isDebugEnabled()) {
                     LOGGER.debug("new WatchKey: {}  ; with watchable {}", key, key.watchable());
                 }
-                handlePolls(key, config);
+                handlePolls(key, configs);
 
                 boolean resetValid = key.reset();
                 if (!resetValid) {
@@ -209,13 +221,16 @@ class FileWatcherRunable implements Runnable {
         }
     }
 
-    private void handlePolls(WatchKey key, WatchKeyConfig config) {
-        for (WatchEvent<?> event : key.pollEvents()) {
+    private void handlePolls(WatchKey key, List<WatchKeyConfig> configs) {
+        List<WatchEvent<?>> events = key.pollEvents();
+        for (WatchEvent<?> event : events) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("new WatchEvent to handleEvent: {} , kind: {}, context: {} , count: {}", event,
                         event.kind(), event.context(), event.count());
             }
-            handleEvent(event, config);
+            for (WatchKeyConfig config : configs) {
+                handleEvent(event, config);
+            }
         }
     }
 
@@ -294,13 +309,6 @@ class FileWatcherRunable implements Runnable {
         } catch (IOException e) {
             LOGGER.error("Exception while rescanning directory: {}", path, e);
         }
-    }
-
-    private void unregisterKey(WatchKey watchKey) {
-        LOGGER.info("unregister watchkey: {}", watchKey);
-        watchKey.cancel();
-        WatchKeyConfig watchKeyConfig = watchKeysToConfig.remove(watchKey);
-        LOGGER.info("unregistered watchkey for: {}", watchKeyConfig);
     }
 
     private static List<Kind<?>> readKindsProperty(Map<String, Object> props) {
