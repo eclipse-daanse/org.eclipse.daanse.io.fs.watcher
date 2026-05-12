@@ -134,14 +134,6 @@ class FileWatcherRunable implements Runnable {
         Path path = config.path();
 
         LOGGER.info("register Path: {}", path);
-        try (Stream<Path> stream = Files.list(path)) {
-            Stream<Path> filtered = config.oPattern()
-                    .map(pattern -> stream.filter(p -> pattern.matcher(p.toString()).matches()))
-                    .orElse(stream);
-            List<Path> currentPaths = filtered.toList();
-            FileSystemWatcherListener listener = config.listener();
-            listener.handleInitialPaths(currentPaths);
-        }
 
         rwl.writeLock().lock();
         try {
@@ -149,6 +141,15 @@ class FileWatcherRunable implements Runnable {
             watchKeysToConfig.computeIfAbsent(watchKey, k -> new ArrayList<>()).add(config);
         } finally {
             rwl.writeLock().unlock();
+        }
+
+        try (Stream<Path> stream = Files.list(path)) {
+            Stream<Path> filtered = config.oPattern()
+                    .map(pattern -> stream.filter(p -> pattern.matcher(p.toString()).matches()))
+                    .orElse(stream);
+            List<Path> currentPaths = filtered.toList();
+            FileSystemWatcherListener listener = config.listener();
+            listener.handleInitialPaths(currentPaths);
         }
 
     }

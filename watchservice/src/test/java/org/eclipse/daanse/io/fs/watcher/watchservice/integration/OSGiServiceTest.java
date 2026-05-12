@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import org.eclipse.daanse.io.fs.watcher.api.FileSystemWatcherListener;
@@ -149,6 +150,67 @@ class OSGiServiceTest {
 
         sregCsv.unregister();
         sregTxt.unregister();
+    }
+
+    @Test
+    void testEventsDuringSlowInitialPathsAreNotLost() throws Exception {
+        StoringFileSystemWatcherListener listener = new StoringFileSystemWatcherListener() {
+            @Override
+            public void handleInitialPaths(List<Path> initialPaths) {
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                super.handleInitialPaths(initialPaths);
+            }
+        };
+
+        Map<String, Object> map = Map.of(
+                FileSystemWatcherWhiteboardConstants.FILESYSTEM_WATCHER_PATH, path.toAbsolutePath().toString());
+
+        Path file = path.resolve("race.txt");
+
+        // Run file ops on a separate thread, so they execute regardless of whether SCR
+        // dispatches bind synchronously (registerService would block for ~3s) or async.
+        // The thread waits until the bind thread has set the base path, then gives it a
+        // short head-start to enter the slow handleInitialPaths before creating+deleting.
+        Thread fileOps = new Thread(() -> {
+            try {
+                await().atMost(WAIT_MOST).until(() -> listener.getBasePath() != null);
+                Thread.sleep(500);
+                Files.createFile(file);
+                Files.delete(file);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        fileOps.start();
+
+        ServiceRegistration<FileSystemWatcherListener> sreg = bc.registerService(FileSystemWatcherListener.class,
+                listener, asDictionary(map));
+
+        fileOps.join();
+
+        await().atMost(WAIT_MOST).until(() -> listener.getEvents().stream()
+                .anyMatch(e -> e.getKey().equals(file)
+                        && e.getValue().equals(StandardWatchEventKinds.ENTRY_CREATE))
+                && listener.getEvents().stream()
+                        .anyMatch(e -> e.getKey().equals(file)
+                                && e.getValue().equals(StandardWatchEventKinds.ENTRY_DELETE)));
+
+        assertThat(listener.getEvents())
+                .as("create and delete happening while handleInitialPaths is still running must both be reported")
+                .anySatisfy(e -> {
+                    assertThat(e.getKey()).isEqualTo(file);
+                    assertThat(e.getValue()).isEqualTo(StandardWatchEventKinds.ENTRY_CREATE);
+                })
+                .anySatisfy(e -> {
+                    assertThat(e.getKey()).isEqualTo(file);
+                    assertThat(e.getValue()).isEqualTo(StandardWatchEventKinds.ENTRY_DELETE);
+                });
+
+        sreg.unregister();
     }
 
     @Test
