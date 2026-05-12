@@ -135,7 +135,10 @@ class FileWatcherRunable implements Runnable {
 
         LOGGER.info("register Path: {}", path);
         try (Stream<Path> stream = Files.list(path)) {
-            List<Path> currentPaths = stream.toList();
+            Stream<Path> filtered = config.oPattern()
+                    .map(pattern -> stream.filter(p -> pattern.matcher(p.toString()).matches()))
+                    .orElse(stream);
+            List<Path> currentPaths = filtered.toList();
             FileSystemWatcherListener listener = config.listener();
             listener.handleInitialPaths(currentPaths);
         }

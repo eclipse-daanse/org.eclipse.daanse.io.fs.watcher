@@ -151,4 +151,28 @@ class OSGiServiceTest {
         sregTxt.unregister();
     }
 
+    @Test
+    void testInitialPathsAreFilteredByPattern() throws Exception {
+        Path csvFile = Files.createFile(path.resolve("preexisting.csv"));
+        Path txtFile = Files.createFile(path.resolve("preexisting.txt"));
+
+        StoringFileSystemWatcherListener listener = new StoringFileSystemWatcherListener();
+
+        Map<String, Object> map = Map.of(
+                FileSystemWatcherWhiteboardConstants.FILESYSTEM_WATCHER_PATH, path.toAbsolutePath().toString(),
+                FileSystemWatcherWhiteboardConstants.FILESYSTEM_WATCHER_PATTERN, ".*\\.csv");
+
+        ServiceRegistration<FileSystemWatcherListener> sreg = bc.registerService(FileSystemWatcherListener.class,
+                listener, asDictionary(map));
+
+        await().atMost(WAIT_MOST).until(() -> listener.getBasePath() != null);
+
+        assertThat(listener.getInitialPaths())
+                .as("initial paths should only contain files matching the pattern")
+                .containsExactly(csvFile)
+                .doesNotContain(txtFile);
+
+        sreg.unregister();
+    }
+
 }
